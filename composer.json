@@ -1,0 +1,32 @@
+{
+    "name": "iwai/react-resque",
+    "type": "library",
+    "description": "ReactPHP based resque worker and job in event loop implementation in PHP",
+    "keywords": [ "job", "background", "redis", "resque", "react" ],
+    "homepage": "https://github.com/iwai/react-resque",
+    "license": "MIT",
+    "authors": [
+        { "name": "Yuji Iwai", "email": "iwai.ug@gmail.com" }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "ext-pcntl": "*",
+        "ext-libev": "*",
+        "kamisama/php-resque-ex": ">=1.2.7",
+        "react/react": "0.4.*",
+        "clue/redis-react": "v0.4.0",
+        "evenement/evenement": "2.0.*",
+        "mkraemer/react-pcntl": "2.0.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Iwai\\React\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "files": [ "demo/job.php" ]
+    },
+    "bin": [
+        "bin/resque"
+    ]
+}

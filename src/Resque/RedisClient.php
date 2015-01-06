@@ -132,7 +132,6 @@ class RedisClient {
             $args[1][0] = self::$defaultNamespace . $args[1][0];
         }
         return $this->client->then(function (Redis\Client $client) use ($name, $args) {
-            echo sprintf('%s %s in %s at %d', $name, implode(',', $args[1]), __FILE__, __LINE__) . PHP_EOL;
             return call_user_func_array([$client, $name], $args[1]);
         }, function (\Exception $e) {
             // TODO: throw はまずい

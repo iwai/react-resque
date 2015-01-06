@@ -68,7 +68,8 @@ class Worker extends \Resque_Worker {
         $this->options = $options;
         $this->loop    = $loop;
 
-        Resque::setEventLoop($loop);
+        if ($loop !== null)
+            Resque::setEventLoop($loop);
 
         parent::__construct($options['queue']);
     }
@@ -171,8 +172,6 @@ class Worker extends \Resque_Worker {
 
         $job->worker = $this;
 
-        echo sprintf('%s in %s at %d', get_class($job), __FILE__, __LINE__) . PHP_EOL;
-
         return $job->perform()->then(function () use ($job, $startTime) {
 
             $this->log(array('message' => 'done ID:' . $job->payload['id'], 'data' => array('type' => 'done', 'job_id' => $job->payload['id'], 'time' => round(microtime(true) - $startTime, 3) * 1000)), self::LOG_TYPE_INFO);
@@ -252,8 +251,6 @@ class Worker extends \Resque_Worker {
         $workerPids = $this->workerPids();
 
         self::all()->then(function ($worker) use ($workerPids) {
-            echo sprintf('%s in %s at %d', gettype($worker), __FILE__, __LINE__) . PHP_EOL;
-
             if (!($worker instanceof Worker))
                 return;
 

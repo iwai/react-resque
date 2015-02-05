@@ -26,6 +26,9 @@ use Resque_Worker;
 
 class Worker extends \Resque_Worker {
 
+    public $processing = 0;
+    public $waitShutdown = false;
+
     protected $options;
 
     protected $loop;
@@ -40,15 +43,16 @@ class Worker extends \Resque_Worker {
 
             return \React\Promise\map($response, function ($workerId) {
 
-                return Resque::redis()->sismember('workers', $workerId)->then(function ($exists) use ($workerId) {
+                return Resque::redis()->sismember(
+                    'workers', $workerId
+                )->then(function ($exists) use ($workerId) {
                     if (!$exists)
                         return;
 
                     list($hostname, $pid, $queues) = explode(':', $workerId, 3);
                     $queues = explode(',', $queues);
-                    $worker = new self($queues);
+                    $worker = new self($queues, \Iwai\React\Resque::getEventLoop());
                     $worker->setId($workerId);
-                    //$worker->logger = $worker->getLogger($workerId);
                     return $worker;
                 });
 
@@ -74,14 +78,24 @@ class Worker extends \Resque_Worker {
         parent::__construct($options['queue']);
     }
 
-
     public function work($interval = 5)
     {
         if ($this->shutdown) {
-            $this->unregisterWorker()->then(function () {
-                $this->loop->stop();
-            });
-            return;
+            if (!$this->waitShutdown) {
+                $this->retry($this->loop, function () {
+                    if ($this->processing === 0)
+                        return \React\Promise\resolve(null);
+                    sleep(1);
+                    return \React\Promise\reject();
+                })->then(function () {
+                    return $this->unregisterWorker();
+                })->then(function ($responses) {
+                    return Resque::redis()->close();
+                })->then(function ($response = null) {
+                    $this->loop->stop();
+                });
+                $this->waitShutdown = true;
+            }
         }
 
         $this->reserve()->then(
@@ -94,36 +108,33 @@ class Worker extends \Resque_Worker {
                 $names     = explode(':', $name);
                 $queueName = array_pop($names);
 
-                echo sprintf(
-                        '%s:%s in %s at %d', $queueName, $payload, __FILE__, __LINE__
-                    ) . PHP_EOL;
-
                 $job = new Job($queueName, json_decode($payload, true));
 
                 $this->perform($job);
-
             },
-            function (\Exception $e) use ($interval) {
-                echo $e->getMessage() . PHP_EOL;
-                $this->shutdown();
-                $this->work($interval);
+            function (\Exception $e) {
+                throw $e;
             }
         )->then(function () use ($interval) {
 
-            $this->work($interval);
+            $this->loop->futureTick(function () use ($interval) {
+                $this->work($interval);
+            });
 
         }, function (\Exception $e) use ($interval) {
-
-            echo $e->getMessage().PHP_EOL;
+            echo sprintf('%s:%s in %s at %d', get_class($e), $e->getMessage(), __FILE__, __LINE__) . PHP_EOL;
+            error_log($e);
 
             $this->shutdown();
             $this->work($interval);
         });
+
     }
 
     public function run($interval = 5)
     {
         $this->startup()->then(function () use ($interval) {
+            pcntl_alarm(0);
             $this->work($interval);
         });
         $this->loop->run();
@@ -136,6 +147,11 @@ class Worker extends \Resque_Worker {
      */
     public function reserve()
     {
+        if ($this->waitShutdown) {
+            sleep($this->options['interval']);
+            return \React\Promise\resolve();
+        }
+
         $queues = $this->queues();
 
         if ($queues instanceof PromiseInterface) {
@@ -200,10 +216,9 @@ class Worker extends \Resque_Worker {
      */
     protected function startup()
     {
-        //$this->log(array('message' => 'Starting worker ' . $this, 'data' => array('type' => 'start', 'worker' => (string) $this)), self::LOG_TYPE_INFO);
+        pcntl_alarm(30);
         $this->registerSigHandlers();
         $this->pruneDeadWorkers();
-//        Resque_Event::trigger('beforeFirstFork', $this);
 
         return $this->registerWorker();
     }
@@ -230,9 +245,9 @@ class Worker extends \Resque_Worker {
      */
     public function unregisterWorker()
     {
-        if (is_object($this->currentJob)) {
-            $this->currentJob->fail(new \Resque_Job_DirtyExitException());
-        }
+//        if (is_object($this->currentJob)) {
+//            $this->currentJob->fail(new \Resque_Job_DirtyExitException());
+//        }
 
         $id = (string)$this;
 
@@ -250,16 +265,17 @@ class Worker extends \Resque_Worker {
     {
         $workerPids = $this->workerPids();
 
-        self::all()->then(function ($worker) use ($workerPids) {
-            if (!($worker instanceof Worker))
-                return;
+        self::all()->then(function ($workers) use ($workerPids) {
+            foreach ($workers as $worker) {
+                if (!($worker instanceof Worker))
+                    continue;
 
-            list($host, $pid, $queues) = explode(':', (string)$worker, 3);
-            if ($host != $this->hostname || in_array($pid, $workerPids) || $pid == getmypid()) {
-                return;
+                list($host, $pid, $queues) = explode(':', (string)$worker, 3);
+                if ($host != $this->hostname || in_array($pid, $workerPids) || $pid == getmypid()) {
+                    continue;
+                }
+                $worker->unregisterWorker();
             }
-            //$this->log(array('message' => 'Pruning dead worker: ' . (string)$worker, 'data' => array('type' => 'prune')), self::LOG_TYPE_DEBUG);
-            $worker->unregisterWorker();
         });
     }
 
@@ -290,5 +306,38 @@ class Worker extends \Resque_Worker {
         $this->log(array('message' => 'Registered signals', 'data' => array('type' => 'signal')), self::LOG_TYPE_DEBUG);
     }
 
+    /**
+     * @param LoopInterface $loop
+     * @param \Closure      $callback
+     * @param int           $interval
+     * @param Deferred      $deferred
+     *
+     * @return PromiseInterface
+     */
+    private function retry($loop, $callback, $interval = 3, $deferred = null)
+    {
+        $deferred = $deferred ?: new \React\Promise\Deferred();
+
+        /** @var PromiseInterface $promise */
+        $promise = $callback();
+
+        $promise->then(
+            function ($response) use ($deferred) {
+                $deferred->resolve($response);
+            },
+            function (\Exception $e = null) use ($loop, $callback, $interval, $deferred) {
+                if ($e !== null)
+                    echo sprintf('%s: %s', get_class($e), $e->getMessage()) . PHP_EOL;
+
+                $loop->addTimer($interval,
+                    function ($timer) use ($loop, $callback, $interval, $deferred) {
+                        $this->retry($loop, $callback, $interval, $deferred);
+                    }
+                );
+            }
+        );
+
+        return $deferred->promise();
+    }
 
 }

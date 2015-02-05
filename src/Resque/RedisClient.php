@@ -11,6 +11,8 @@
 namespace Iwai\React\Resque;
 
 use Clue\React\Redis;
+use React\SocketClient\Connector;
+use React\Dns\Resolver\Factory as ResolverFactory;
 
 class RedisClient {
 
@@ -85,6 +87,7 @@ class RedisClient {
     protected $target;
     protected $loop;
     protected $client;
+    static private $connector;
 
 
     function __construct($target, $loop)
@@ -92,7 +95,8 @@ class RedisClient {
         $this->target = $target;
         $this->loop   = $loop;
 
-        $this->client = (new Redis\Factory($loop))->createClient($target);
+        self::$connector = new Connector($loop, (new ResolverFactory())->create('8.8.8.8', $loop));
+        $this->client = (new Redis\Factory($loop, self::$connector))->createClient($target);
     }
 
     /**
@@ -113,7 +117,16 @@ class RedisClient {
     }
 
     function establishConnection() {
-        $this->client = (new Redis\Factory($this->loop))->createClient($this->target);
+        $this->client = (new Redis\Factory($this->loop, self::$connector))->createClient($this->target);
+    }
+
+    public function close()
+    {
+        return $this->client->then(function (Redis\Client $client) {
+            return $client->end();
+        }, function (\Exception $e) {
+            throw $e;
+        });
     }
 
     /**

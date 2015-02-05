@@ -20,7 +20,7 @@ class Job extends \Resque_Job {
     public $queue;
 
     /**
-     * @var Resque_Worker Instance of the Resque worker running this job.
+     * @var Worker Instance of the Resque worker running this job.
      */
     public $worker;
 
@@ -33,6 +33,8 @@ class Job extends \Resque_Job {
      * @var object Instance of the class performing work for this job.
      */
     private $instance;
+
+    static private $handler;
 
     /**
      * Instantiate a new instance of a job.
@@ -150,6 +152,16 @@ class Job extends \Resque_Job {
         $this->instance->job = $this;
         $this->instance->args = $this->getArguments();
         $this->instance->queue = $this->queue;
+
+        if (!self::$handler) {
+            self::$handler = new \WyriHaximus\React\RingPHP\HttpClientAdapter(
+                Resque::getEventLoop()
+            );
+            $this->instance->handler = self::$handler;
+        } else {
+            $this->instance->handler = self::$handler;
+        }
+
         return $this->instance;
     }
 
@@ -163,17 +175,37 @@ class Job extends \Resque_Job {
         $deferred = new \React\Promise\Deferred();
 
         $promise = $deferred->promise();
+        $promise->then(function () {
+            $this->worker->processing++;
+        });
+
         if(method_exists($instance, 'setUp')) {
-            $promise = $instance->setUp($promise);
+            $promise = $promise->then(function () use ($instance) {
+                return \React\Promise\resolve($instance->setUp());
+            });
         }
 
-        $promise = $instance->perform($promise);
+        $promise = $promise->then(function () use ($instance) {
+            return \React\Promise\resolve($instance->perform());
+        });
 
         if(method_exists($instance, 'tearDown')) {
-            $promise = $instance->tearDown($promise);
+            $promise = $promise->then(function () use ($instance) {
+                return \React\Promise\resolve($instance->tearDown());
+            });
         }
 
+        $promise->then(
+            function () {
+                $this->worker->processing--;
+            },
+            function (\Exception $e) {
+                error_log($e);
+            }
+        );
+
         $deferred->resolve();
+
         return $promise;
     }
 

@@ -69,9 +69,11 @@ class Resque extends \Resque {
 //            }
 
             $client = new RedisClient($server, self::$loop);
-            $client->prefix(self::$namespace);
+            //$client->prefix(self::$namespace);
             self::$redis = $client;
         }
+        self::$redis->establishConnection();
+        self::$redis->prefix(self::$namespace);
         self::$redis->select(self::$redisDatabase);
 
         return self::$redis;

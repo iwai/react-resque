@@ -95,7 +95,10 @@ class RedisClient {
         $this->target = $target;
         $this->loop   = $loop;
 
-        self::$connector = new Connector($loop, (new ResolverFactory())->create('8.8.8.8', $loop));
+        $resolver = (new ResolverFactory())->createCached('8.8.8.8', $loop);
+
+        self::$connector = new Redis\PersistentConnector($loop, $resolver);
+        //self::$connector = new Connector($loop, $resolver);
         $this->client = (new Redis\Factory($loop, self::$connector))->createClient($target);
     }
 
@@ -147,7 +150,6 @@ class RedisClient {
         return $this->client->then(function (Redis\Client $client) use ($name, $args) {
             return call_user_func_array([$client, $name], $args[1]);
         }, function (\Exception $e) {
-            // TODO: throw はまずい
             throw $e;
         });
     }

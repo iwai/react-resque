@@ -108,3 +108,4 @@ $worker = new Resque\Worker(
 );
 
 $worker->run();
+

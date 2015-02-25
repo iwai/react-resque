@@ -41,10 +41,9 @@ class Resque extends \Resque {
     {
         // Detect when the PID of the current process has changed (from a fork, etc)
         // and force a reconnect to redis.
-        $pid = getmypid();
-        if (self::$pid !== $pid) {
+        if (!self::$pid) {
             self::$redis = null;
-            self::$pid   = $pid;
+            self::$pid   = getmypid();
         }
 
         if(!is_null(self::$redis)) {
@@ -60,19 +59,9 @@ class Resque extends \Resque {
             die('Unsupported multiple redis server.');
         }
         else {
-//            if (strpos($server, 'unix:') === false) {
-//                list($host, $port) = explode(':', $server);
-//            }
-//            else {
-//                $host = $server;
-//                $port = null;
-//            }
-
             $client = new RedisClient($server, self::$loop);
-            //$client->prefix(self::$namespace);
             self::$redis = $client;
         }
-        self::$redis->establishConnection();
         self::$redis->prefix(self::$namespace);
         self::$redis->select(self::$redisDatabase);
 

@@ -8,13 +8,16 @@
     "authors": [
         { "name": "Yuji Iwai", "email": "iwai.ug@gmail.com" }
     ],
+    "repositories": [
+        { "type": "vcs", "url": "https://github.com/iwai/php-redis-react.git" }
+    ],
     "require": {
         "php": ">=5.4.0",
         "ext-pcntl": "*",
         "ext-libev": "*",
         "kamisama/php-resque-ex": ">=1.2.7",
         "react/react": "0.4.*",
-        "clue/redis-react": "v0.4.0",
+        "clue/redis-react": "dev-support-persitent as 0.4.0-dev",
         "evenement/evenement": "2.0.*",
         "mkraemer/react-pcntl": "2.0.0"
     },

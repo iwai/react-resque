@@ -10,6 +10,7 @@
 namespace Iwai\React\Resque;
 
 use Iwai\React\Resque;
+use React\Promise\PromiseInterface;
 use Resque_Job;
 
 class Job extends \Resque_Job {
@@ -157,10 +158,8 @@ class Job extends \Resque_Job {
             self::$handler = new \WyriHaximus\React\RingPHP\HttpClientAdapter(
                 Resque::getEventLoop()
             );
-            $this->instance->handler = self::$handler;
-        } else {
-            $this->instance->handler = self::$handler;
         }
+        $this->instance->handler = self::$handler;
 
         return $this->instance;
     }
@@ -186,7 +185,7 @@ class Job extends \Resque_Job {
         }
 
         $promise = $promise->then(function () use ($instance) {
-            return \React\Promise\resolve($instance->perform());
+            return $instance->perform();
         });
 
         if(method_exists($instance, 'tearDown')) {
@@ -199,7 +198,13 @@ class Job extends \Resque_Job {
             function () {
                 $this->worker->processing--;
             },
-            function (\Exception $e) {
+            function ($e) {
+                $this->worker->processing--;
+
+                if ($e instanceof \Exception) {
+                    error_log(sprintf('%s:%s in %s at %d',
+                        get_class($e), $e->getMessage(), __FILE__, __LINE__));
+                }
                 error_log($e);
             }
         );

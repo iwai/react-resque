@@ -78,6 +78,9 @@ class Worker extends \Resque_Worker {
         parent::__construct($options['queue']);
     }
 
+    protected $startTime;
+    protected $startTimeP;
+
     public function work($interval = 5)
     {
         if ($this->shutdown) {
@@ -98,8 +101,16 @@ class Worker extends \Resque_Worker {
             }
         }
 
+//        if ($this->startTime)
+//            error_log(sprintf('time: %.5f', microtime(true) - $this->startTime));
+        $this->startTime = microtime(true);
+        $this->startTimeP = microtime(true);
+
         $this->reserve()->then(
-            function ($response) {
+            function ($response) use ($interval) {
+                //error_log(sprintf('reserve time: %.6f', microtime(true) - $this->startTimeP));
+                $this->startTimeP = microtime(true);
+
                 if (!$response)
                     return;
 
@@ -109,25 +120,28 @@ class Worker extends \Resque_Worker {
                 $queueName = array_pop($names);
 
                 $job = new Job($queueName, json_decode($payload, true));
+                $job->worker = $this;
 
-                $this->perform($job);
+                $job->perform();
+
+                //error_log(sprintf('perform time: %.6f', microtime(true) - $this->startTimeP));
             },
             function (\Exception $e) {
                 throw $e;
             }
-        )->then(function () use ($interval) {
-
-            $this->loop->futureTick(function () use ($interval) {
+        )->then(
+            function () use ($interval) {
                 $this->work($interval);
-            });
+            },
+            function (\Exception $e) use ($interval) {
+                error_log(sprintf('%s:%s in %s at %d',
+                    get_class($e), $e->getMessage(), __FILE__, __LINE__));
+                error_log($e);
 
-        }, function (\Exception $e) use ($interval) {
-            echo sprintf('%s:%s in %s at %d', get_class($e), $e->getMessage(), __FILE__, __LINE__) . PHP_EOL;
-            error_log($e);
-
-            $this->shutdown();
-            $this->work($interval);
-        });
+                $this->shutdown();
+                $this->work($interval);
+            }
+        );
 
     }
 
@@ -184,23 +198,10 @@ class Worker extends \Resque_Worker {
     public function perform(\Resque_Job $job)
     {
         /** @var Job $job */
-        $startTime = microtime(true);
-
         $job->worker = $this;
 
-        return $job->perform()->then(function () use ($job, $startTime) {
-
-            $this->log(array('message' => 'done ID:' . $job->payload['id'], 'data' => array('type' => 'done', 'job_id' => $job->payload['id'], 'time' => round(microtime(true) - $startTime, 3) * 1000)), self::LOG_TYPE_INFO);
-
-        }, function (\Exception $e) use ($job, $startTime) {
-
-            $this->log(array('message' => $job . ' failed: ' . $e->getMessage(), 'data' => array('type' => 'fail', 'log' => $e->getMessage(), 'job_id' => $job->payload['id'], 'time' => round(microtime(true) - $startTime, 3) * 1000)), self::LOG_TYPE_ERROR);
-            $job->fail($e);
-            $job->updateStatus(\Resque_Job_Status::STATUS_COMPLETE);
-
-        });
+        return $job->perform();
     }
-
 
     public function queues($fetch = true)
     {

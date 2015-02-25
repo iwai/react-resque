@@ -4,7 +4,7 @@
         "Read more about it at http://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "667051e8aafbe06dcac56ca9d5fea80c",
+    "hash": "733bbb2c2b703ab7e0f23823ea024570",
     "packages": [
         {
             "name": "clue/redis-protocol",
@@ -52,16 +52,16 @@
         },
         {
             "name": "clue/redis-react",
-            "version": "v0.4.0",
+            "version": "dev-support-persitent",
             "source": {
                 "type": "git",
-                "url": "https://github.com/clue/php-redis-react.git",
-                "reference": "3ec3c01a7f00f98db1299f1ccede685372fa25b0"
+                "url": "https://github.com/iwai/php-redis-react.git",
+                "reference": "7866dbe28739ced26c190dc8080b2a9b0a805aac"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/clue/php-redis-react/zipball/3ec3c01a7f00f98db1299f1ccede685372fa25b0",
-                "reference": "3ec3c01a7f00f98db1299f1ccede685372fa25b0",
+                "url": "https://api.github.com/repos/iwai/php-redis-react/zipball/7866dbe28739ced26c190dc8080b2a9b0a805aac",
+                "reference": "7866dbe28739ced26c190dc8080b2a9b0a805aac",
                 "shasum": ""
             },
             "require": {
@@ -78,7 +78,6 @@
                     "Clue\\React\\Redis\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -96,7 +95,10 @@
                 "react",
                 "redis"
             ],
-            "time": "2014-08-25 22:50:00"
+            "support": {
+                "source": "https://github.com/iwai/php-redis-react/tree/support-persitent"
+            },
+            "time": "2015-02-25 03:07:39"
         },
         {
             "name": "evenement/evenement",
@@ -150,12 +152,12 @@
             "target-dir": "Guzzle/Parser",
             "source": {
                 "type": "git",
-                "url": "https://github.com/guzzle/parser.git",
+                "url": "https://github.com/Guzzle3/parser.git",
                 "reference": "6874d171318a8e93eb6d224cf85e4678490b625c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/parser/zipball/6874d171318a8e93eb6d224cf85e4678490b625c",
+                "url": "https://api.github.com/repos/Guzzle3/parser/zipball/6874d171318a8e93eb6d224cf85e4678490b625c",
                 "reference": "6874d171318a8e93eb6d224cf85e4678490b625c",
                 "shasum": ""
             },
@@ -186,20 +188,21 @@
                 "message",
                 "url"
             ],
+            "abandoned": "guzzle/guzzle",
             "time": "2014-02-05 18:29:46"
         },
         {
             "name": "kamisama/monolog-init",
-            "version": "0.1.1",
+            "version": "0.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/kamisama/Monolog-Init.git",
-                "reference": "ece3ce44ea8f1b761afff038fb3efdcc0564e763"
+                "reference": "026080034da41dcfe015a7da6ca8cd6f3960eabb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/kamisama/Monolog-Init/zipball/ece3ce44ea8f1b761afff038fb3efdcc0564e763",
-                "reference": "ece3ce44ea8f1b761afff038fb3efdcc0564e763",
+                "url": "https://api.github.com/repos/kamisama/Monolog-Init/zipball/026080034da41dcfe015a7da6ca8cd6f3960eabb",
+                "reference": "026080034da41dcfe015a7da6ca8cd6f3960eabb",
                 "shasum": ""
             },
             "require": {
@@ -220,8 +223,7 @@
                 {
                     "name": "Wan Chen",
                     "email": "kami@kamisama.me",
-                    "homepage": "http://www.kamisama.me",
-                    "role": "Developer"
+                    "homepage": "http://www.kamisama.me"
                 }
             ],
             "description": "Very basic and light Dependency Injector Container for Monolog",
@@ -229,20 +231,20 @@
             "keywords": [
                 "log"
             ],
-            "time": "2013-06-20 18:42:53"
+            "time": "2015-01-27 17:54:55"
         },
         {
             "name": "kamisama/php-resque-ex",
-            "version": "1.2.7",
+            "version": "1.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/kamisama/php-resque-ex.git",
-                "reference": "1fa1989ca1669b185ffd354ed0c574857545480d"
+                "reference": "4dde6a0be180c30748af5f4818e2543d665b9369"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/kamisama/php-resque-ex/zipball/1fa1989ca1669b185ffd354ed0c574857545480d",
-                "reference": "1fa1989ca1669b185ffd354ed0c574857545480d",
+                "url": "https://api.github.com/repos/kamisama/php-resque-ex/zipball/4dde6a0be180c30748af5f4818e2543d665b9369",
+                "reference": "4dde6a0be180c30748af5f4818e2543d665b9369",
                 "shasum": ""
             },
             "require": {
@@ -257,6 +259,9 @@
             "suggest": {
                 "fresque/fresque": "A command line tool to manage your workers"
             },
+            "bin": [
+                "bin/resque"
+            ],
             "type": "library",
             "autoload": {
                 "psr-0": {
@@ -269,14 +274,13 @@
             ],
             "authors": [
                 {
-                    "name": "Wan Chen",
-                    "email": "kami@kamisama.me",
-                    "homepage": "http://www.kamisama.me",
-                    "role": "Developer"
-                },
-                {
                     "name": "Chris Boulton",
                     "email": "chris@bigcommerce.com"
+                },
+                {
+                    "name": "Wan Chen",
+                    "email": "kami@kamisama.me",
+                    "homepage": "http://www.kamisama.me"
                 }
             ],
             "description": "Redis backed library for creating background jobs and processing them later. PHP port based on resque for Ruby.",
@@ -289,7 +293,7 @@
                 "redis",
                 "resque"
             ],
-            "time": "2013-10-15 15:35:49"
+            "time": "2015-01-28 23:00:53"
         },
         {
             "name": "mkraemer/react-pcntl",
@@ -335,16 +339,16 @@
         },
         {
             "name": "monolog/monolog",
-            "version": "1.11.0",
+            "version": "1.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Seldaek/monolog.git",
-                "reference": "ec3961874c43840e96da3a8a1ed20d8c73d7e5aa"
+                "reference": "1fbe8c2641f2b163addf49cc5e18f144bec6b19f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/ec3961874c43840e96da3a8a1ed20d8c73d7e5aa",
-                "reference": "ec3961874c43840e96da3a8a1ed20d8c73d7e5aa",
+                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/1fbe8c2641f2b163addf49cc5e18f144bec6b19f",
+                "reference": "1fbe8c2641f2b163addf49cc5e18f144bec6b19f",
                 "shasum": ""
             },
             "require": {
@@ -358,7 +362,7 @@
                 "aws/aws-sdk-php": "~2.4, >2.4.8",
                 "doctrine/couchdb": "~1.0@dev",
                 "graylog2/gelf-php": "~1.0",
-                "phpunit/phpunit": "~3.7.0",
+                "phpunit/phpunit": "~4.0",
                 "raven/raven": "~0.5",
                 "ruflin/elastica": "0.90.*",
                 "videlalvaro/php-amqplib": "~2.4"
@@ -377,7 +381,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "1.11.x-dev"
+                    "dev-master": "1.12.x-dev"
                 }
             },
             "autoload": {
@@ -403,7 +407,7 @@
                 "logging",
                 "psr-3"
             ],
-            "time": "2014-09-30 13:30:58"
+            "time": "2014-12-29 21:29:35"
         },
         {
             "name": "psr/log",
@@ -694,16 +698,16 @@
         },
         {
             "name": "react/promise",
-            "version": "v2.1.0",
+            "version": "v2.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/reactphp/promise.git",
-                "reference": "937b04f1b0ee8f6d180e75a0830aac778ca4bcd6"
+                "reference": "365fcee430dfa4ace1fbc75737ca60ceea7eeeef"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/reactphp/promise/zipball/937b04f1b0ee8f6d180e75a0830aac778ca4bcd6",
-                "reference": "937b04f1b0ee8f6d180e75a0830aac778ca4bcd6",
+                "url": "https://api.github.com/repos/reactphp/promise/zipball/365fcee430dfa4ace1fbc75737ca60ceea7eeeef",
+                "reference": "365fcee430dfa4ace1fbc75737ca60ceea7eeeef",
                 "shasum": ""
             },
             "require": {
@@ -720,7 +724,7 @@
                     "React\\Promise\\": "src/"
                 },
                 "files": [
-                    "src/functions.php"
+                    "src/functions_include.php"
                 ]
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -734,7 +738,7 @@
                 }
             ],
             "description": "A lightweight implementation of CommonJS Promises/A for PHP",
-            "time": "2014-10-15 20:05:57"
+            "time": "2014-12-30 13:32:42"
         },
         {
             "name": "react/react",
@@ -922,9 +926,18 @@
         }
     ],
     "packages-dev": [],
-    "aliases": [],
+    "aliases": [
+        {
+            "alias": "0.4.0-dev",
+            "alias_normalized": "0.4.0.0-dev",
+            "version": "dev-support-persitent",
+            "package": "clue/redis-react"
+        }
+    ],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "clue/redis-react": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

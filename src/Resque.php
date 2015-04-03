@@ -59,7 +59,9 @@ class Resque extends \Resque {
             die('Unsupported multiple redis server.');
         }
         else {
-            $client = new RedisClient($server, self::$loop);
+            $client = new RedisClient(
+                $server, self::$loop, self::nameserver()
+            );
             self::$redis = $client;
         }
         self::$redis->prefix(self::$namespace);
@@ -93,4 +95,19 @@ class Resque extends \Resque {
         return self::redis()->smembers('queues');
     }
 
+    private static function nameserver()
+    {
+        static $nameserver = null;
+        if ($nameserver === null) {
+            $resolver = explode("\n", file_get_contents('/etc/resolv.conf'));
+            foreach ($resolver as $line) {
+                if (strpos($line, 'nameserver') === 0) {
+                    $entry = preg_split('/[\s]+/', $line);
+                    return $nameserver = $entry[1];
+                }
+            }
+            $nameserver = '8.8.8.8';
+        }
+        return $nameserver;
+    }
 } 

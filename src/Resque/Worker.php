@@ -11,17 +11,12 @@
 namespace Iwai\React\Resque;
 
 
-//use Clue\Redis\Protocol\Model\ModelInterface;
-//use Evenement\EventEmitter;
 use Iwai\React\Resque;
-use Iwai\React\Resque\Job;
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
 use React\Promise;
 use MKraemer\ReactPCNTL\PCNTL;
 
-//use Resque_Event;
-//use Resque_Job_DirtyExitException;
 use Resque_Worker;
 
 class Worker extends \Resque_Worker {
@@ -31,6 +26,7 @@ class Worker extends \Resque_Worker {
 
     protected $options;
 
+    /** @var LoopInterface  */
     protected $loop;
 
     /**
@@ -65,21 +61,18 @@ class Worker extends \Resque_Worker {
      * @param array|string  $options
      * @param LoopInterface $loop
      *
-     * @internal param array|string $queues
      */
     public function __construct($options, LoopInterface $loop = null)
     {
         $this->options = $options;
-        $this->loop    = $loop;
 
-        if ($loop !== null)
+        if ($loop !== null) {
+            $this->loop = $loop;
             Resque::setEventLoop($loop);
+        }
 
         parent::__construct($options['queue']);
     }
-
-    protected $startTime;
-    protected $startTimeP;
 
     public function work($interval = 5)
     {
@@ -87,30 +80,23 @@ class Worker extends \Resque_Worker {
             if (!$this->waitShutdown) {
                 $this->retry($this->loop, function () {
                     if ($this->processing === 0)
-                        return \React\Promise\resolve(null);
-                    sleep(1);
+                        return \React\Promise\resolve();
                     return \React\Promise\reject();
-                })->then(function () {
+                })->then(function ($responses = null) {
                     return $this->unregisterWorker();
-                })->then(function ($responses) {
+                })->then(function ($responses = null) {
                     return Resque::redis()->close();
                 })->then(function ($response = null) {
+                    $this->loop->stop();
+                }, function ($e = null) {
                     $this->loop->stop();
                 });
                 $this->waitShutdown = true;
             }
         }
 
-//        if ($this->startTime)
-//            error_log(sprintf('time: %.5f', microtime(true) - $this->startTime));
-        $this->startTime = microtime(true);
-        $this->startTimeP = microtime(true);
-
         $this->reserve()->then(
             function ($response) use ($interval) {
-                //error_log(sprintf('reserve time: %.6f', microtime(true) - $this->startTimeP));
-                $this->startTimeP = microtime(true);
-
                 if (!$response)
                     return;
 
@@ -119,19 +105,20 @@ class Worker extends \Resque_Worker {
                 $names     = explode(':', $name);
                 $queueName = array_pop($names);
 
+                /** @var \Iwai\React\Resque\Job $job */
                 $job = new Job($queueName, json_decode($payload, true));
                 $job->worker = $this;
 
                 $job->perform();
-
-                //error_log(sprintf('perform time: %.6f', microtime(true) - $this->startTimeP));
             },
             function (\Exception $e) {
                 throw $e;
             }
         )->then(
             function () use ($interval) {
-                $this->work($interval);
+                $this->loop->futureTick(function () use ($interval) {
+                    $this->work($interval);
+                });
             },
             function (\Exception $e) use ($interval) {
                 error_log(sprintf('%s:%s in %s at %d',
@@ -145,7 +132,7 @@ class Worker extends \Resque_Worker {
 
     }
 
-    public function run($interval = 5)
+    public function run($interval = 3)
     {
         $this->startup()->then(function () use ($interval) {
             pcntl_alarm(0);
@@ -186,21 +173,15 @@ class Worker extends \Resque_Worker {
                 });
             }
         } else {
-            return Resque::bpop($queues, $this->options['interval']);
+            if (
+                $this->options['concurrency'] === null
+                || $this->processing <= $this->options['concurrency']
+            ) {
+                return Resque::bpop($queues, $this->options['interval']);
+            } else {
+                return \React\Promise\resolve();
+            }
         }
-    }
-
-    /**
-     * Process a single job.
-     *
-     * @param \Resque_Job $job The job to be processed.
-     */
-    public function perform(\Resque_Job $job)
-    {
-        /** @var Job $job */
-        $job->worker = $this;
-
-        return $job->perform();
     }
 
     public function queues($fetch = true)
@@ -246,10 +227,6 @@ class Worker extends \Resque_Worker {
      */
     public function unregisterWorker()
     {
-//        if (is_object($this->currentJob)) {
-//            $this->currentJob->fail(new \Resque_Job_DirtyExitException());
-//        }
-
         $id = (string)$this;
 
         return \React\Promise\all([

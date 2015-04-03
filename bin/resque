@@ -53,38 +53,18 @@ $REDIS_DATABASE  = getenv('REDIS_DATABASE');
 $REDIS_NAMESPACE = getenv('REDIS_NAMESPACE');
 $REDIS_PASSWORD  = getenv('REDIS_PASSWORD') == '' ? null : getenv('REDIS_PASSWORD');
 
-$LOG_HANDLER        = getenv('LOGHANDLER');
-$LOG_HANDLER_TARGET = getenv('LOGHANDLERTARGET');
-
-$logger = new MonologInit\MonologInit($LOG_HANDLER, $LOG_HANDLER_TARGET);
-
 if (!empty($REDIS_BACKEND)) {
-    Resque::setBackend($REDIS_BACKEND, $REDIS_DATABASE, $REDIS_NAMESPACE, $REDIS_PASSWORD);
+    Resque::setBackend(
+        $REDIS_BACKEND, $REDIS_DATABASE, $REDIS_NAMESPACE, $REDIS_PASSWORD
+    );
 }
 
-$logLevel = Resque_Worker::LOG_NONE;
-$LOGGING = getenv('LOGGING');
-$VERBOSE = getenv('VERBOSE');
-$VVERBOSE = getenv('VVERBOSE');
-if (!empty($LOGGING) || !empty($VERBOSE)) {
-    $logLevel = Resque_Worker::LOG_NORMAL;
-} elseif (!empty($VVERBOSE)) {
-    $logLevel = Resque_Worker::LOG_VERBOSE;
-}
+$CONCURRENCY = getenv('CONCURRENCY') ?: null;
+$INTERVAL    = getenv('INTERVAL') ?: 3;
+$PIDFILE     = getenv('PIDFILE') ?: 'php://stdout';
 
-$interval = 3;
-$INTERVAL = getenv('INTERVAL');
-if (!empty($INTERVAL)) {
-    $interval = $INTERVAL;
-}
-
-$PIDFILE = getenv('PIDFILE');
-
-if ($PIDFILE) {
-    file_put_contents($PIDFILE, getmypid()) or die('Could not write PID information to ' . $PIDFILE);
-} else {
-    echo getmypid().PHP_EOL;
-}
+file_put_contents($PIDFILE, getmypid())
+  or die('Could not write PID information to ' . $PIDFILE);
 
 $loop  = EventLoop\Factory::create();
 
@@ -95,14 +75,9 @@ $worker = new Resque\Worker(
             'namespace'	=> $REDIS_NAMESPACE ? $REDIS_NAMESPACE : 'resque',
             'database'	=> $REDIS_DATABASE  ? $REDIS_DATABASE  : 0
         ],
-        'queue'    => $QUEUE,
-        'interval' => $interval,
-//        'ttl'      => $ttl,
-        'log' => [
-            'level'		=> $logLevel,
-            'handler'	=> $LOG_HANDLER ? $LOG_HANDLER : 'Stream',
-            'target'	=> $LOG_HANDLER_TARGET ? $LOG_HANDLER_TARGET : '-'
-        ]
+        'queue'       => $QUEUE,
+        'interval'    => $INTERVAL,
+        'concurrency' => $CONCURRENCY,
     ],
     $loop
 );

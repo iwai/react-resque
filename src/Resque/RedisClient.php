@@ -90,15 +90,14 @@ class RedisClient {
     static private $connector;
 
 
-    function __construct($target, $loop)
+    function __construct($target, $loop, $nameserver = '8.8.8.8')
     {
         $this->target = $target;
         $this->loop   = $loop;
 
-        $resolver = (new ResolverFactory())->createCached('8.8.8.8', $loop);
+        $resolver = (new ResolverFactory())->createCached($nameserver, $loop);
 
         self::$connector = new Redis\PersistentConnector($loop, $resolver);
-        //self::$connector = new Connector($loop, $resolver);
         $this->client = (new Redis\Factory($loop, self::$connector))->createClient($target);
     }
 
@@ -119,14 +118,10 @@ class RedisClient {
         return self::$defaultNamespace;
     }
 
-    function establishConnection() {
-        $this->client = (new Redis\Factory($this->loop, self::$connector))->createClient($this->target);
-    }
-
     public function close()
     {
         return $this->client->then(function (Redis\Client $client) {
-            return $client->end();
+            return $client->close();
         }, function (\Exception $e) {
             throw $e;
         });
@@ -148,6 +143,7 @@ class RedisClient {
             $args[1][0] = self::$defaultNamespace . $args[1][0];
         }
         return $this->client->then(function (Redis\Client $client) use ($name, $args) {
+            //error_log(sprintf('%s:%s', $name, json_encode($args)));
             return call_user_func_array([$client, $name], $args[1]);
         }, function (\Exception $e) {
             throw $e;

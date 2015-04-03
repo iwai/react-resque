@@ -15,27 +15,12 @@ use Resque_Job;
 
 class Job extends \Resque_Job {
 
-    /**
-     * @var string The name of the queue that this job belongs to.
-     */
-    public $queue;
-
-    /**
-     * @var Worker Instance of the Resque worker running this job.
-     */
-    public $worker;
-
-    /**
-     * @var object Object containing details of the job.
-     */
-    public $payload;
+    /** @var Worker $worker */
 
     /**
      * @var object Instance of the class performing work for this job.
      */
     private $instance;
-
-    static private $handler;
 
     /**
      * Instantiate a new instance of a job.
@@ -67,28 +52,18 @@ class Job extends \Resque_Job {
             );
         }
 
-        $new = true;
         if(isset($args['id'])) {
             $id = $args['id'];
             unset($args['id']);
-            $new = false;
         } else {
             $id = md5(uniqid('', true));
         }
+
         Resque::push($queue, array(
             'class'	=> $class,
             'args'	=> array($args),
             'id'	=> $id,
         ));
-
-        if ($monitor) {
-            if ($new) {
-                \Resque_Job_Status::create($id);
-            } else {
-                $statusInstance = new \Resque_Job_Status($id);
-                $statusInstance->update($id, \Resque_Job_Status::STATUS_WAITING);
-            }
-        }
 
         return $id;
     }
@@ -150,16 +125,9 @@ class Job extends \Resque_Job {
             $this->instance = new $this->payload['class']();
         }
 
-        $this->instance->job = $this;
-        $this->instance->args = $this->getArguments();
+        $this->instance->job   = $this;
+        $this->instance->args  = $this->getArguments();
         $this->instance->queue = $this->queue;
-
-        if (!self::$handler) {
-            self::$handler = new \WyriHaximus\React\RingPHP\HttpClientAdapter(
-                Resque::getEventLoop()
-            );
-        }
-        $this->instance->handler = self::$handler;
 
         return $this->instance;
     }
@@ -189,7 +157,7 @@ class Job extends \Resque_Job {
         });
 
         if(method_exists($instance, 'tearDown')) {
-            $promise = $promise->then(function () use ($instance) {
+            $promise = $promise->then(function ($response = null) use ($instance) {
                 return \React\Promise\resolve($instance->tearDown());
             });
         }

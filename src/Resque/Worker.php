@@ -12,6 +12,7 @@ namespace Iwai\React\Resque;
 
 
 use Iwai\React\Resque;
+use Iwai\React\Resque\Job;
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
 use React\Promise;
@@ -22,11 +23,11 @@ use Resque_Worker;
 class Worker extends \Resque_Worker {
 
     public $processing = 0;
+    public $processed  = 0;
     public $waitShutdown = false;
 
     protected $options;
 
-    /** @var LoopInterface  */
     protected $loop;
 
     /**
@@ -82,17 +83,25 @@ class Worker extends \Resque_Worker {
                     if ($this->processing === 0)
                         return \React\Promise\resolve();
                     return \React\Promise\reject();
-                })->then(function ($responses = null) {
-                    return $this->unregisterWorker();
-                })->then(function ($responses = null) {
-                    return Resque::redis()->close();
                 })->then(function ($response = null) {
-                    $this->loop->stop();
-                }, function ($e = null) {
-                    $this->loop->stop();
+
+                    $this->loop->addTimer(3, function ($timer) {
+                        $this->unregisterWorker()->then(function ($response = null) {
+                            return Resque::redis()->quit()->then(function ($response = null) {
+                                return Resque::redis()->close();
+                            });
+                        })->then(function ($response = null) {
+                            $this->loop->stop();
+                        }, function ($e = null) {
+                            error_log($e);
+                            $this->loop->stop();
+                        });
+                    });
+
                 });
                 $this->waitShutdown = true;
             }
+            return;
         }
 
         $this->reserve()->then(
@@ -105,14 +114,10 @@ class Worker extends \Resque_Worker {
                 $names     = explode(':', $name);
                 $queueName = array_pop($names);
 
-                /** @var \Iwai\React\Resque\Job $job */
                 $job = new Job($queueName, json_decode($payload, true));
                 $job->worker = $this;
 
                 $job->perform();
-            },
-            function (\Exception $e) {
-                throw $e;
             }
         )->then(
             function () use ($interval) {
@@ -120,9 +125,10 @@ class Worker extends \Resque_Worker {
                     $this->work($interval);
                 });
             },
-            function (\Exception $e) use ($interval) {
-                error_log(sprintf('%s:%s in %s at %d',
-                    get_class($e), $e->getMessage(), __FILE__, __LINE__));
+            function ($e = null) use ($interval) {
+                if ($e instanceof \Exception)
+                  error_log(sprintf('%s:%s in %s at %d',
+                      get_class($e), $e->getMessage(), __FILE__, __LINE__));
                 error_log($e);
 
                 $this->shutdown();
@@ -134,7 +140,7 @@ class Worker extends \Resque_Worker {
 
     public function run($interval = 3)
     {
-        $this->startup()->then(function () use ($interval) {
+        $this->startup()->then(function ($response = null) use ($interval) {
             pcntl_alarm(0);
             $this->work($interval);
         });
@@ -148,11 +154,6 @@ class Worker extends \Resque_Worker {
      */
     public function reserve()
     {
-        if ($this->waitShutdown) {
-            sleep($this->options['interval']);
-            return \React\Promise\resolve();
-        }
-
         $queues = $this->queues();
 
         if ($queues instanceof PromiseInterface) {
@@ -164,7 +165,7 @@ class Worker extends \Resque_Worker {
                 return $queues->then(function ($response) {
                     if (empty($response)) {
                         sleep($this->options['interval']);
-                        return \React\Promise\resolve(null);
+                        return \React\Promise\resolve();
                     }
 
                     return Resque::bpop(
@@ -173,10 +174,7 @@ class Worker extends \Resque_Worker {
                 });
             }
         } else {
-            if (
-                $this->options['concurrency'] === null
-                || $this->processing <= $this->options['concurrency']
-            ) {
+            if ($this->processing <= $this->options['concurrency']) {
                 return Resque::bpop($queues, $this->options['interval']);
             } else {
                 return \React\Promise\resolve();
@@ -212,11 +210,13 @@ class Worker extends \Resque_Worker {
      */
     public function registerWorker()
     {
-        return Resque::redis()->sadd('workers', (string)$this)->then(function () {
+        return Resque::redis()->sadd('workers', (string)$this)->then(function ($response = null) {
             return Resque::redis()->set(
                 'worker:' . (string)$this . ':started',
                 strftime('%a %b %d %H:%M:%S %Z %Y')
             );
+        }, function ($e = null) {
+            error_log($e);
         });
     }
 
@@ -227,33 +227,35 @@ class Worker extends \Resque_Worker {
      */
     public function unregisterWorker()
     {
-        $id = (string)$this;
-
         return \React\Promise\all([
-            Resque::redis()->srem('workers', $id),
-            Resque::redis()->del('worker:' . $id),
-            Resque::redis()->del('worker:' . $id . ':started'),
-            \Resque_Stat::clear('processed:' . $id),
-            \Resque_Stat::clear('failed:' . $id),
-            Resque::redis()->hdel('workerLogger', $id),
+            Resque::redis()->srem('workers', (string)$this),
+            Resque::redis()->del('worker:' . (string)$this),
+            Resque::redis()->del('worker:' . (string)$this . ':started')
         ]);
     }
 
     public function pruneDeadWorkers()
     {
-        $workerPids = $this->workerPids();
+        $worker_pids = $this->workerPids();
 
-        self::all()->then(function ($workers) use ($workerPids) {
-            foreach ($workers as $worker) {
-                if (!($worker instanceof Worker))
-                    continue;
+        return Resque::redis()->smembers('workers')->then(function ($response) use ($worker_pids) {
+            $promises = \React\Promise\map($response, function ($workerId) use ($worker_pids) {
 
-                list($host, $pid, $queues) = explode(':', (string)$worker, 3);
-                if ($host != $this->hostname || in_array($pid, $workerPids) || $pid == getmypid()) {
-                    continue;
+                list($hostname, $pid, $queues) = explode(':', $workerId, 3);
+
+                if ($hostname != $this->hostname
+                    || in_array($pid, $worker_pids)
+                    || $pid == getmypid()) {
+                    return null;
                 }
-                $worker->unregisterWorker();
-            }
+
+                $queues = explode(',', $queues);
+                $worker = new self($queues, \Iwai\React\Resque::getEventLoop());
+                $worker->setId($workerId);
+
+                return $worker->unregisterWorker();
+            });
+            return \React\Promise\all($promises);
         });
     }
 
@@ -270,8 +272,11 @@ class Worker extends \Resque_Worker {
 
         $pcntl = new PCNTL($this->loop);
 
-        foreach ([ SIGTERM, SIGINT, SIGQUIT, SIGUSR1] as $signal) {
-            $pcntl->on($signal, function () {
+        $pcntl->on(SIGCHLD, function ($signo = null) {
+        });
+
+        foreach ([SIGTERM, SIGHUP, SIGINT, SIGQUIT, SIGUSR1] as $signal) {
+            $pcntl->on($signal, function ($signo = null) {
                 $this->shutdown();
             });
         }
@@ -279,9 +284,6 @@ class Worker extends \Resque_Worker {
         $pcntl->on(SIGUSR2, [ $this, 'pauseProcessing' ]);
         $pcntl->on(SIGCONT, [ $this, 'unPauseProcessing' ]);
         $pcntl->on(SIGPIPE, [ $this, 'reestablishRedisConnection' ]);
-
-        //declare(ticks = 1);
-        $this->log(array('message' => 'Registered signals', 'data' => array('type' => 'signal')), self::LOG_TYPE_DEBUG);
     }
 
     /**
@@ -303,9 +305,16 @@ class Worker extends \Resque_Worker {
             function ($response) use ($deferred) {
                 $deferred->resolve($response);
             },
-            function (\Exception $e = null) use ($loop, $callback, $interval, $deferred) {
-                if ($e !== null)
-                    echo sprintf('%s: %s', get_class($e), $e->getMessage()) . PHP_EOL;
+            function ($e = null) use ($loop, $callback, $interval, $deferred) {
+                if ($e !== null) {
+                    if ($e instanceof \RuntimeException) {
+                        error_log($e);
+                    } elseif ($e instanceof \Exception) {
+                        error_log(sprintf('%s: %s', get_class($e), $e->getMessage()));
+                    } else {
+                        error_log($e);
+                    }
+                }
 
                 $loop->addTimer($interval,
                     function ($timer) use ($loop, $callback, $interval, $deferred) {

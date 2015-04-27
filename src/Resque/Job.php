@@ -15,7 +15,7 @@ use Resque_Job;
 
 class Job extends \Resque_Job {
 
-    /** @var Worker $worker */
+    /** @var \Iwai\React\Resque\Worker $worker */
 
     /**
      * @var object Instance of the class performing work for this job.
@@ -58,7 +58,6 @@ class Job extends \Resque_Job {
         } else {
             $id = md5(uniqid('', true));
         }
-
         Resque::push($queue, array(
             'class'	=> $class,
             'args'	=> array($args),
@@ -163,11 +162,13 @@ class Job extends \Resque_Job {
         }
 
         $promise->then(
-            function () {
+            function ($responses = null) {
                 $this->worker->processing--;
+                $this->worker->processed++;
             },
             function ($e) {
                 $this->worker->processing--;
+                $this->worker->processed++;
 
                 if ($e instanceof \Exception) {
                     error_log(sprintf('%s:%s in %s at %d',

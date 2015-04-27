@@ -59,9 +59,9 @@ if (!empty($REDIS_BACKEND)) {
     );
 }
 
-$CONCURRENCY = getenv('CONCURRENCY') ?: null;
 $INTERVAL    = getenv('INTERVAL') ?: 3;
 $PIDFILE     = getenv('PIDFILE') ?: 'php://stdout';
+$CONCURRENCY = getenv('CONCURRENCY') ?: 5;
 
 file_put_contents($PIDFILE, getmypid())
   or die('Could not write PID information to ' . $PIDFILE);
